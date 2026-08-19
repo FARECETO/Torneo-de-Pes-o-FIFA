@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FIFA ARENA — Gestor de Torneos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800;900&family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="bg-fx" aria-hidden="true">
+  <div class="bg-grid"></div>
+  <div class="bg-glow bg-glow--purple"></div>
+  <div class="bg-glow bg-glow--cyan"></div>
+</div>
+
+<div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+<div class="app" id="app">
+
+  <!-- ============ PANTALLA DE CONFIGURACIÓN ============ -->
+  <section id="setup-screen" class="screen setup-screen">
+    <div class="setup-hero">
+      <p class="eyebrow">GESTOR DE TORNEOS · EDICIÓN LOCAL</p>
+      <h1 class="logo-title">FIFA <span class="accent">ARENA</span></h1>
+      <p class="tagline">Arma la liga. Reparte los cruces. Corona al campeón.</p>
+    </div>
+
+    <div class="setup-card">
+
+      <div class="setup-step">
+        <label class="step-label"><span class="step-num">01</span> Nombre del torneo</label>
+        <input id="tournament-name" class="text-input" type="text" placeholder="Ej: Copa Amigos Invierno 2026" maxlength="42" autocomplete="off">
+      </div>
+
+      <div class="setup-step">
+        <label class="step-label"><span class="step-num">02</span> Jugadores</label>
+        <div class="player-input-row">
+          <input id="player-input" class="text-input" type="text" placeholder="Nombre del jugador, o varios separados por comas" autocomplete="off">
+          <input id="player-club-input" class="text-input club-input" type="text" placeholder="Club o país (opcional)" autocomplete="off">
+          <button id="add-player-btn" class="btn btn-secondary" type="button">Agregar</button>
+        </div>
+        <p class="field-hint">El club/país solo se asigna cuando agregas un jugador a la vez (no aplica al pegar una lista con comas).</p>
+        <div id="players-list" class="players-chip-list" aria-live="polite"></div>
+        <p class="player-count" id="player-count">0 jugadores inscritos</p>
+      </div>
+
+      <div class="setup-step">
+        <label class="step-label"><span class="step-num">03</span> Formato del torneo</label>
+        <div class="format-grid" id="format-grid">
+          <button type="button" class="format-card" data-format="league">
+            <span class="format-icon">🔁</span>
+            <span class="format-name">Mini Liga</span>
+            <span class="format-desc">Todos contra todos. 3 puntos por ganar, 1 por empate.</span>
+          </button>
+          <button type="button" class="format-card" data-format="groups">
+            <span class="format-icon">🗂️</span>
+            <span class="format-name">Grupos + Eliminatoria</span>
+            <span class="format-desc">Grupos con tabla propia. Los mejores pasan al bracket final.</span>
+          </button>
+          <button type="button" class="format-card" data-format="knockout">
+            <span class="format-icon">⚔️</span>
+            <span class="format-name">Eliminación Directa</span>
+            <span class="format-desc">Sin segundas oportunidades. Un cruce, un ganador.</span>
+          </button>
+        </div>
+
+        <div id="match-mode-config" class="format-extra-config hidden">
+          <div class="extra-field">
+            <label>Modalidad de partidos</label>
+            <div class="toggle-group" id="match-mode-toggle">
+              <button type="button" class="toggle-btn selected" data-mode="single">Solo ida</button>
+              <button type="button" class="toggle-btn" data-mode="double">Ida y vuelta</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="groups-config" class="format-extra-config hidden">
+          <div class="extra-field">
+            <label for="players-per-group">Jugadores por grupo</label>
+            <input type="number" id="players-per-group" min="3" max="6" value="4">
+          </div>
+          <div class="extra-field">
+            <label for="qualifiers-per-group">Clasifican por grupo</label>
+            <input type="number" id="qualifiers-per-group" min="1" max="4" value="2">
+          </div>
+        </div>
+      </div>
+
+      <p id="setup-warning" class="setup-warning hidden"></p>
+
+      <button id="start-tournament-btn" class="btn btn-primary btn-large" type="button">
+        Iniciar Torneo <span class="btn-arrow">→</span>
+      </button>
+    </div>
+  </section>
+
+  <!-- ============ PANTALLA DE TORNEO ============ -->
+  <section id="tournament-screen" class="screen tournament-screen hidden">
+    <header class="tournament-header">
+      <div class="th-left">
+        <p class="th-eyebrow" id="tournament-format-badge">FORMATO</p>
+        <h1 class="tournament-title" id="tournament-title">Nombre del Torneo</h1>
+      </div>
+      <button id="reset-tournament-btn" class="btn btn-ghost" type="button">Nuevo Torneo</button>
+    </header>
+
+    <nav class="tabs" id="tabs-nav" role="tablist"></nav>
+
+    <div class="tab-content" id="tab-content"></div>
+  </section>
+
+</div>
+
+<!-- ============ MODAL: Registrar Resultado ============ -->
+<div id="score-modal" class="modal-overlay hidden">
+  <div class="modal score-modal">
+    <button class="modal-close" id="close-score-modal" type="button" aria-label="Cerrar">&times;</button>
+    <p class="modal-eyebrow" id="modal-round-label">PARTIDO</p>
+    <h2 class="modal-title">Registrar Resultado</h2>
+
+    <div class="score-modal-players">
+      <div class="score-player">
+        <span class="score-player-name" id="modal-p1-name">Jugador 1</span>
+        <input type="number" min="0" max="99" id="modal-p1-score" class="score-input" value="0" inputmode="numeric">
+      </div>
+      <span class="score-vs">VS</span>
+      <div class="score-player">
+        <span class="score-player-name" id="modal-p2-name">Jugador 2</span>
+        <input type="number" min="0" max="99" id="modal-p2-score" class="score-input" value="0" inputmode="numeric">
+      </div>
+    </div>
+
+    <div id="penalty-section" class="penalty-section hidden">
+      <p class="penalty-note">⚠ Empate en fase eliminatoria — definir por penales</p>
+      <div class="score-modal-players score-modal-players--pen">
+        <div class="score-player">
+          <input type="number" min="0" max="99" id="modal-p1-pen" class="score-input pen-input" value="0" inputmode="numeric">
+        </div>
+        <span class="score-vs score-vs--sm">PEN</span>
+        <div class="score-player">
+          <input type="number" min="0" max="99" id="modal-p2-pen" class="score-input pen-input" value="0" inputmode="numeric">
+        </div>
+      </div>
+    </div>
+
+    <p id="modal-error" class="modal-error hidden"></p>
+
+    <button id="save-score-btn" class="btn btn-primary btn-large" type="button">Guardar Resultado</button>
+  </div>
+</div>
+
+<!-- ============ MODAL: Confirmar reinicio ============ -->
+<div id="confirm-modal" class="modal-overlay hidden">
+  <div class="modal confirm-modal">
+    <h2 class="modal-title">¿Empezar un nuevo torneo?</h2>
+    <p class="confirm-text">Se borrará todo el progreso del torneo actual. Esta acción no se puede deshacer.</p>
+    <div class="confirm-actions">
+      <button id="cancel-reset-btn" class="btn btn-ghost" type="button">Cancelar</button>
+      <button id="confirm-reset-btn" class="btn btn-danger" type="button">Sí, borrar todo</button>
+    </div>
+  </div>
+</div>
+
+<canvas id="confetti-canvas"></canvas>
+
+<script src="script.js"></script>
+</body>
+</html>
