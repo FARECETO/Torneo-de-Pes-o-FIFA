@@ -546,6 +546,7 @@ table.standings tr.qualified td.player-name::before { content: '▸ '; color: va
   position: absolute; inset: 0;
   background: linear-gradient(90deg, rgba(139,58,247,.06), transparent 40%);
   opacity: 0; transition: opacity .2s var(--ease);
+  pointer-events: none;
 }
 .match-card:hover { border-color: rgba(139,58,247,.4); transform: translateY(-2px); }
 .match-card:hover::before { opacity: 1; }
