@@ -284,12 +284,18 @@ function createTournament(name, playerEntries, format, config) {
   };
 
   if (format === 'league') {
-    state.league = { matches: generarFixture(state.players, config.doubleRound) };
+    const fixture = generarFixture(state.players, config.doubleRound);
+    state.league = { matches: fixture.matches, restMap: fixture.restMap, totalJornadas: fixture.totalJornadas };
   }
 
   if (format === 'groups') {
     state.groups = buildGroups(state.players, config.playersPerGroup);
-    state.groups.forEach(g => { g.matches = generarFixture(g.players, config.doubleRound); });
+    state.groups.forEach(g => {
+      const fixture = generarFixture(g.players, config.doubleRound);
+      g.matches = fixture.matches;
+      g.restMap = fixture.restMap;
+      g.totalJornadas = fixture.totalJornadas;
+    });
     state.knockout = null;
   }
 
@@ -312,19 +318,64 @@ function notifyByes(knockout, totalPlayers) {
   }
 }
 
-// Genera todos los cruces posibles entre una lista de jugadores (round robin).
-// Si doubleRound es true, genera además el partido de vuelta (local/visita invertidos).
-function generarFixture(players, doubleRound) {
-  const matches = [];
-  for (let i = 0; i < players.length; i++) {
-    for (let j = i + 1; j < players.length; j++) {
-      matches.push({ id: uid(), p1: players[i], p2: players[j], s1: null, s2: null, played: false, leg: doubleRound ? 1 : null });
-      if (doubleRound) {
-        matches.push({ id: uid(), p1: players[j], p2: players[i], s1: null, s2: null, played: false, leg: 2 });
-      }
+// Arma el calendario tipo "todos contra todos" repartido en jornadas (método del círculo).
+// Devuelve rondas donde cada jugador juega una sola vez por jornada; si el número de
+// jugadores es impar, cada jugador descansa exactamente una jornada.
+function scheduleRoundRobin(players) {
+  const list = players.slice();
+  if (list.length % 2 !== 0) list.push(null); // null = "fecha libre" para completar el par
+  const n = list.length;
+  const arr = list.slice();
+  const rounds = [];
+
+  for (let r = 0; r < n - 1; r++) {
+    const round = [];
+    for (let i = 0; i < n / 2; i++) {
+      const a = arr[i], b = arr[n - 1 - i];
+      if (a === null) round.push({ rest: b });
+      else if (b === null) round.push({ rest: a });
+      else round.push({ p1: a, p2: b });
     }
+    rounds.push(round);
+    const last = arr.pop();
+    arr.splice(1, 0, last);
   }
-  return matches;
+  return rounds;
+}
+
+// Genera el fixture completo organizado por jornadas, más el mapa de "descansos" por jornada.
+// Si doubleRound es true, agrega una segunda vuelta (mismos cruces, local/visita invertidos).
+function generarFixture(players, doubleRound) {
+  const rounds = scheduleRoundRobin(players);
+  const matches = [];
+  const restMap = {};
+  let jornada = 0;
+
+  rounds.forEach(round => {
+    jornada++;
+    round.forEach(item => {
+      if (item.rest) {
+        restMap[jornada] = item.rest;
+      } else {
+        matches.push({ id: uid(), p1: item.p1, p2: item.p2, s1: null, s2: null, played: false, leg: doubleRound ? 1 : null, jornada });
+      }
+    });
+  });
+
+  if (doubleRound) {
+    rounds.forEach(round => {
+      jornada++;
+      round.forEach(item => {
+        if (item.rest) {
+          restMap[jornada] = item.rest;
+        } else {
+          matches.push({ id: uid(), p1: item.p2, p2: item.p1, s1: null, s2: null, played: false, leg: 2, jornada });
+        }
+      });
+    });
+  }
+
+  return { matches, restMap, totalJornadas: jornada };
 }
 
 function buildGroups(players, size) {
@@ -561,8 +612,28 @@ function renderLeaguePanel() {
 function renderLeagueMatchesPanel() {
   return `
     <h2 class="section-title">Partidos (${state.league.matches.filter(m => m.played).length}/${state.league.matches.length} jugados)</h2>
-    ${renderMatchList(state.league.matches, { type: 'league' })}
+    ${renderMatchesByJornada(state.league, { type: 'league' })}
   `;
+}
+
+// Agrupa los partidos de un fixture (liga o grupo) por jornada, mostrando también
+// el aviso de "descansa" cuando el número de jugadores es impar.
+function renderMatchesByJornada(scheduleData, ctx) {
+  const { matches, restMap, totalJornadas } = scheduleData;
+  let html = '';
+  for (let j = 1; j <= totalJornadas; j++) {
+    const jornadaMatches = matches.filter(m => m.jornada === j);
+    const restPlayer = restMap[j];
+    if (jornadaMatches.length === 0 && !restPlayer) continue;
+    html += `
+      <div class="jornada-block">
+        <h3 class="jornada-title">Jornada ${j}${jornadaMatches[0] && jornadaMatches[0].leg === 2 ? ' · Vuelta' : ''}</h3>
+        ${jornadaMatches.length ? renderMatchList(jornadaMatches, ctx) : ''}
+        ${restPlayer ? `<div class="rest-card">😴 <strong>${playerLabelHtml(restPlayer)}</strong> descansa esta jornada</div>` : ''}
+      </div>
+    `;
+  }
+  return html;
 }
 
 function renderStandingsTable(table, qualifyCount) {
@@ -635,7 +706,7 @@ function renderGroupsPanel() {
         <h2 class="section-title">${escapeHtml(g.name)}</h2>
         ${renderStandingsTable(table, qc)}
         <div style="height:16px"></div>
-        ${renderMatchList(g.matches, { type: 'group', groupId: g.id })}
+        ${renderMatchesByJornada(g, { type: 'group', groupId: g.id })}
       </div>
     `;
   });
@@ -941,6 +1012,22 @@ function saveLeagueMatch(matchId, s1, s2) {
   const m = state.league.matches.find(x => x.id === matchId);
   if (!m) return;
   m.s1 = s1; m.s2 = s2; m.played = true;
+
+  checkLeaguePhaseComplete();
+}
+
+function checkLeaguePhaseComplete() {
+  if (state.status === 'finished') return;
+  const allDone = state.league.matches.every(m => m.played);
+  if (!allDone) return;
+
+  const table = computeTable(state.players, state.league.matches);
+  state.status = 'finished';
+  state.champion = table[0] ? table[0].name : null;
+  state.runnerUp = table[1] ? table[1].name : null;
+  state.third = table[2] ? table[2].name : null;
+  activeTabId = 'champion';
+  showToast(`👑 ¡${state.champion} es el campeón de la Mini Liga!`, 6000);
 }
 
 function saveGroupMatch(groupId, matchId, s1, s2) {
