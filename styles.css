@@ -526,6 +526,33 @@ table.standings tr.qualified td.player-name::before { content: '▸ '; color: va
 }
 .standings-legend span.dot-green::before { content:'●'; color: var(--accent-green); margin-right: 5px; }
 
+/* ---------- Jornadas ---------- */
+.jornada-block { margin-bottom: 28px; }
+.jornada-block:last-child { margin-bottom: 0; }
+
+.jornada-title {
+  font-family: var(--font-mono);
+  font-size: .8rem;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--accent-purple-2);
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed var(--border-soft);
+}
+
+.rest-card {
+  margin-top: 10px;
+  background: var(--bg-panel);
+  border: 1px dashed var(--border-soft);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  color: var(--text-dim);
+  font-size: .92rem;
+  font-weight: 600;
+}
+.rest-card strong { color: var(--text-primary); }
+
 /* ---------- Tarjetas de partidos ---------- */
 .match-grid { display: grid; gap: 12px; }
 
